@@ -1,0 +1,55 @@
+pipeline {
+    agent any
+    tools{
+        jdk 'jdk17'
+        maven 'maven3'
+    }
+    environment {
+        SCANNER_HOME = tool 'sonar-scanner'
+    
+    }
+    stages {
+        stage('checkout') {
+            steps {
+                git branch: 'main', changelog: false, poll: false, url: 'https://github.com/Alekya1210/Devops-CICD.git'
+            }
+        }
+        stage('complie') {
+            steps {
+                sh 'mvn clean compile'
+            } 
+        }
+        stage('SonarQube Analysis') {
+            steps {
+                script {
+                    // Run SonarQube Scanner for analysis
+                    withSonarQubeEnv('sonar-scanner') {
+                        sh 'mvn clean install sonar:sonar'
+                        sh ''' $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=CICD \
+                        -Dsonar.java.binaries=. \
+                        -Dsonar.projectKey=CICD '''
+                    }
+                }
+            }
+        }
+        stage('Image scan Trivy') {
+            steps {
+                sh "trivy fs . > trivyfs.txt"
+            } 
+        }
+        stage('maven build') {
+            steps {
+                sh 'mvn clean install'
+            } 
+        }
+        stage('docker build') {
+            steps {
+                script {
+                    withDockerRegistry(credentialsId: '098f9de6-633d-4239-8e39-9df52f326b69', toolName: 'docker-latest') {
+                    sh 'docker build -t devops .'
+               }
+            }   
+        }
+    }
+}
+}
